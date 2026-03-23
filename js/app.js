@@ -15,6 +15,7 @@ class MarkdownTranslatorApp {
         this.bindEvents();
         this.loadSavedSettings();
         this.updateUI();
+        this.populateLanguageOptions();
     }
     
     bindEvents() {
@@ -66,6 +67,47 @@ class MarkdownTranslatorApp {
         document.getElementById('clearBtn').addEventListener('click', () => {
             this.clearAll();
         });
+        
+        // 测试 API 连接按钮（新增）
+        const testApiBtn = document.createElement('button');
+        testApiBtn.id = 'testApiBtn';
+        testApiBtn.className = 'btn btn-secondary';
+        testApiBtn.textContent = '测试 API 连接';
+        testApiBtn.style.marginTop = '10px';
+        testApiBtn.addEventListener('click', () => {
+            this.testAPIConnection();
+        });
+        
+        const deeplxSection = document.querySelector('.config-group:first-child');
+        const saveBtn = document.getElementById('saveDeeplxSettings');
+        saveBtn.parentNode.insertBefore(testApiBtn, saveBtn.nextSibling);
+    }
+    
+    populateLanguageOptions() {
+        const select = document.getElementById('targetLang');
+        select.innerHTML = '';
+        
+        const languages = [
+            { code: 'ZH', name: '中文 (Chinese)' },
+            { code: 'EN-US', name: '英语 - 美式 (English - US)' },
+            { code: 'EN-GB', name: '英语 - 英式 (English - UK)' },
+            { code: 'JA', name: '日语 (Japanese)' },
+            { code: 'KO', name: '韩语 (Korean)' },
+            { code: 'FR', name: '法语 (French)' },
+            { code: 'DE', name: '德语 (German)' },
+            { code: 'ES', name: '西班牙语 (Spanish)' },
+            { code: 'IT', name: '意大利语 (Italian)' },
+            { code: 'PT-BR', name: '葡萄牙语 - 巴西 (Portuguese - Brazilian)' },
+            { code: 'PT-PT', name: '葡萄牙语 - 欧洲 (Portuguese - European)' },
+            { code: 'RU', name: '俄语 (Russian)' }
+        ];
+        
+        languages.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.code;
+            option.textContent = lang.name;
+            select.appendChild(option);
+        });
     }
     
     loadSavedSettings() {
@@ -103,8 +145,18 @@ class MarkdownTranslatorApp {
         document.getElementById('downloadPDFBtn').disabled = !hasTranslation;
         
         // 更新状态指示器
-        document.getElementById('deeplxStatus').className = isConfigured ? 'status configured' : 'status not-configured';
-        document.getElementById('githubStatus').className = this.github.isValid() ? 'status configured' : 'status not-configured';
+        const deeplxStatus = document.getElementById('deeplxStatus');
+        const githubStatus = document.getElementById('githubStatus');
+        
+        if (deeplxStatus) {
+            deeplxStatus.className = isConfigured ? 'status configured' : 'status not-configured';
+            document.getElementById('deeplxStatusText').textContent = isConfigured ? '已配置' : '未配置';
+        }
+        
+        if (githubStatus) {
+            githubStatus.className = this.github.isValid() ? 'status configured' : 'status not-configured';
+            document.getElementById('githubStatusText').textContent = this.github.isValid() ? '已配置' : '未配置';
+        }
     }
     
     handleFileUpload(event) {
@@ -137,25 +189,76 @@ class MarkdownTranslatorApp {
     updateWordCount() {
         const words = this.originalContent.split(/\s+/).filter(w => w.length > 0).length;
         const chars = this.originalContent.length;
-        document.getElementById('wordCount').textContent = `${words} 词, ${chars} 字符`;
+        const wordCount = document.getElementById('wordCount');
+        if (wordCount) {
+            wordCount.textContent = `${words} 词, ${chars} 字符`;
+        }
     }
     
     saveDeeplxSettings() {
         const key = document.getElementById('deeplxKey').value.trim();
-        const endpoint = document.getElementById('deeplxEndpoint').value.trim();
+        let endpoint = document.getElementById('deeplxEndpoint').value.trim();
         
         if (!key) {
-            alert('请输入 DeepLX API Key');
+            alert('请输入 DeepL API Key');
             return;
         }
         
-        this.translator.setApiKey(key);
-        if (endpoint) {
-            this.translator.setEndpoint(endpoint);
+        // 如果端点为空，使用默认值
+        if (!endpoint) {
+            endpoint = CONFIG.deeplx.defaultEndpoint;
         }
         
+        this.translator.setApiKey(key);
+        this.translator.setEndpoint(endpoint);
+        
         this.updateUI();
-        this.showMessage('DeepLX 设置已保存', 'success');
+        this.showMessage('DeepL 设置已保存', 'success');
+    }
+    
+    async testAPIConnection() {
+        const key = document.getElementById('deeplxKey').value.trim();
+        let endpoint = document.getElementById('deeplxEndpoint').value.trim();
+        
+        if (!key) {
+            alert('请先输入 DeepL API Key');
+            return;
+        }
+        
+        if (!endpoint) {
+            endpoint = CONFIG.deeplx.defaultEndpoint;
+        }
+        
+        this.showMessage('正在测试 API 连接...', 'info');
+        
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `DeepL-Auth-Key ${key}`
+                },
+                body: JSON.stringify({
+                    text: 'Hello',
+                    target_lang: 'ZH'
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.translations && data.translations[0]) {
+                    const translatedText = data.translations[0].text;
+                    this.showMessage(`✅ API 连接成功！测试翻译: "Hello" → "${translatedText}"`, 'success');
+                } else {
+                    this.showMessage('❌ API 响应格式错误', 'error');
+                }
+            } else {
+                const errorText = await response.text();
+                this.showMessage(`❌ API 错误 (${response.status}): ${errorText}`, 'error');
+            }
+        } catch (error) {
+            this.showMessage(`❌ 连接失败: ${error.message}`, 'error');
+        }
     }
     
     saveGithubSettings() {
@@ -176,7 +279,7 @@ class MarkdownTranslatorApp {
     
     async startTranslation() {
         if (!this.translator.isValid()) {
-            alert('请先配置 DeepLX API Key');
+            alert('请先配置 DeepL API Key');
             return;
         }
         
@@ -189,7 +292,10 @@ class MarkdownTranslatorApp {
         
         // 禁用按钮
         document.getElementById('translateBtn').disabled = true;
-        document.getElementById('progressContainer').style.display = 'block';
+        const progressContainer = document.getElementById('progressContainer');
+        if (progressContainer) {
+            progressContainer.style.display = 'block';
+        }
         
         try {
             this.translatedContent = await this.translator.translateMarkdown(
@@ -201,8 +307,16 @@ class MarkdownTranslatorApp {
             );
             
             // 显示结果
-            document.getElementById('resultOutput').value = this.translatedContent;
-            document.getElementById('resultContainer').style.display = 'block';
+            const resultOutput = document.getElementById('resultOutput');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            if (resultOutput) {
+                resultOutput.value = this.translatedContent;
+            }
+            if (resultContainer) {
+                resultContainer.style.display = 'block';
+            }
+            
             this.updateUI();
             this.showMessage('翻译完成！', 'success');
         } catch (error) {
@@ -210,15 +324,29 @@ class MarkdownTranslatorApp {
             this.showMessage(`翻译失败：${error.message}`, 'error');
         } finally {
             document.getElementById('translateBtn').disabled = false;
-            document.getElementById('progressContainer').style.display = 'none';
+            if (progressContainer) {
+                progressContainer.style.display = 'none';
+            }
         }
     }
     
     updateProgress(completed, total, current) {
-        const percentage = Math.round((completed / total) * 100);
-        document.getElementById('progressBar').style.width = percentage + '%';
-        document.getElementById('progressText').textContent = `翻译中... ${completed}/${total} (${percentage}%)`;
-        document.getElementById('currentSegment').textContent = current.substring(0, 100) + '...';
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const currentSegment = document.getElementById('currentSegment');
+        
+        if (progressBar) {
+            const percentage = Math.round((completed / total) * 100);
+            progressBar.style.width = percentage + '%';
+        }
+        
+        if (progressText) {
+            progressText.textContent = `翻译中... ${completed}/${total} (${Math.round((completed / total) * 100)}%)`;
+        }
+        
+        if (currentSegment) {
+            currentSegment.textContent = current.substring(0, 100) + '...';
+        }
     }
     
     async uploadToGitHub() {
@@ -247,7 +375,6 @@ class MarkdownTranslatorApp {
             
             this.showMessage(`创建成功！仓库地址：${result.url}`, 'success');
             
-            // 询问是否打开仓库
             if (confirm('是否打开 GitHub 仓库？')) {
                 window.open(result.url, '_blank');
             }
@@ -264,9 +391,16 @@ class MarkdownTranslatorApp {
         this.translatedContent = '';
         
         document.getElementById('textInput').value = '';
-        document.getElementById('resultOutput').value = '';
+        const resultOutput = document.getElementById('resultOutput');
+        if (resultOutput) {
+            resultOutput.value = '';
+        }
         document.getElementById('fileInput').value = '';
-        document.getElementById('resultContainer').style.display = 'none';
+        
+        const resultContainer = document.getElementById('resultContainer');
+        if (resultContainer) {
+            resultContainer.style.display = 'none';
+        }
         
         this.updateWordCount();
         this.updateUI();
@@ -274,13 +408,17 @@ class MarkdownTranslatorApp {
     
     showMessage(message, type = 'info') {
         const messageBox = document.getElementById('messageBox');
-        messageBox.textContent = message;
-        messageBox.className = `message-box ${type}`;
-        messageBox.style.display = 'block';
-        
-        setTimeout(() => {
-            messageBox.style.display = 'none';
-        }, 5000);
+        if (messageBox) {
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`;
+            messageBox.style.display = 'block';
+            
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 5000);
+        } else {
+            alert(message);
+        }
     }
 }
 

@@ -2,24 +2,36 @@
 const CONFIG = {
     // DeepLX API 配置
     deeplx: {
-        // 默认 API 端点（用户可以修改）
-        defaultEndpoint: 'https://api.deepl.com/v2/translate',
-        // 或者使用本地 DeepLX 服务器
-        // defaultEndpoint: 'http://localhost:1188/translate',
+        // 官方 DeepL API 端点（免费和付费版本）
+        defaultEndpoint: 'https://api-deepl.com/v2/translate',
         
-        // 支持的语言
+        // 备用端点（如果上面的不可用）
+        // 'https://api-free.deepl.com/v2/translate'  // 免费版专用
+        
+        // DeepLX 开源版（如果你自己部署）
+        // 'http://localhost:1188/translate',
+        
+        // 支持的语言代码
         languages: {
             'ZH': 'Chinese',
-            'EN': 'English',
+            'EN-US': 'English (American)',
+            'EN-GB': 'English (British)',
             'JA': 'Japanese',
             'KO': 'Korean',
             'FR': 'French',
             'DE': 'German',
             'ES': 'Spanish',
             'IT': 'Italian',
-            'PT': 'Portuguese',
+            'PT-BR': 'Portuguese (Brazilian)',
+            'PT-PT': 'Portuguese (European)',
             'RU': 'Russian'
-        }
+        },
+        
+        // DeepL 支持的语言
+        supportedTargetLangs: [
+            'ZH', 'EN-US', 'EN-GB', 'JA', 'KO', 'FR', 'DE', 
+            'ES', 'IT', 'PT-BR', 'PT-PT', 'RU'
+        ]
     },
     
     // GitHub API 配置
@@ -33,7 +45,7 @@ const CONFIG = {
     // 应用配置
     app: {
         name: 'Markdown Translator',
-        version: '1.0.0',
+        version: '1.0.1',
         // 文件大小限制（MB）
         maxFileSize: 10,
         // 支持的文件类型
