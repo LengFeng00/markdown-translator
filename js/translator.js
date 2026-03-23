@@ -1,41 +1,49 @@
-// DeepLX 翻译模块
+// DeepLX 翻译模块 - 支持官方 API 和 DeepLX 开源版
 class MarkdownTranslator {
     constructor() {
         this.apiKey = localStorage.getItem(CONFIG.app.storageKeys.deeplxKey) || '';
         this.endpoint = localStorage.getItem(CONFIG.app.storageKeys.deeplxEndpoint) || CONFIG.deeplx.defaultEndpoint;
+        this.apiType = this.detectAPIType();
+    }
+    
+    // 自动检测 API 类型
+    detectAPIType() {
+        if (this.endpoint.includes('api.deepl.com') || this.endpoint.includes('api-deepl.com')) {
+            return 'official';
+        } else {
+            return 'deeplx';
+        }
     }
     
     // 设置 API Key
     setApiKey(key) {
         this.apiKey = key;
         localStorage.setItem(CONFIG.app.storageKeys.deeplxKey, key);
+        this.apiType = this.detectAPIType();
     }
     
     // 设置 API 端点
     setEndpoint(endpoint) {
         this.endpoint = endpoint;
         localStorage.setItem(CONFIG.app.storageKeys.deeplxEndpoint, endpoint);
+        this.apiType = this.detectAPIType();
     }
     
     // 验证配置
     isValid() {
-        return this.apiKey.length > 0;
+        return this.apiKey.length > 0 && this.endpoint.length > 0;
     }
     
     // 解析 Markdown 为段落
     parseMarkdown(text) {
-        // 将 Markdown 分割为可翻译的段落
         const lines = text.split('\n');
         const paragraphs = [];
         let currentParagraph = [];
         let inCodeBlock = false;
-        let codeBlockLang = '';
         
         for (let line of lines) {
-            // 检测代码块
             if (line.startsWith('```')) {
                 if (inCodeBlock) {
-                    // 代码块结束
                     currentParagraph.push(line);
                     paragraphs.push({
                         type: 'code',
@@ -45,7 +53,6 @@ class MarkdownTranslator {
                     currentParagraph = [];
                     inCodeBlock = false;
                 } else {
-                    // 代码块开始
                     if (currentParagraph.length > 0) {
                         paragraphs.push({
                             type: 'text',
@@ -65,7 +72,6 @@ class MarkdownTranslator {
                 continue;
             }
             
-            // 检测标题（不翻译）
             if (line.startsWith('#')) {
                 if (currentParagraph.length > 0) {
                     paragraphs.push({
@@ -83,21 +89,6 @@ class MarkdownTranslator {
                 continue;
             }
             
-            // 检测列表项
-            if (line.trim().startsWith('-') || line.trim().startsWith('*') || /^\d+\./.test(line.trim())) {
-                if (currentParagraph.length > 0 && !currentParagraph[currentParagraph.length - 1].trim().startsWith('-')) {
-                    paragraphs.push({
-                        type: 'text',
-                        content: currentParagraph.join('\n'),
-                        translatable: true
-                    });
-                    currentParagraph = [];
-                }
-                currentParagraph.push(line);
-                continue;
-            }
-            
-            // 空行
             if (line.trim() === '') {
                 if (currentParagraph.length > 0) {
                     paragraphs.push({
@@ -118,7 +109,6 @@ class MarkdownTranslator {
             currentParagraph.push(line);
         }
         
-        // 处理最后一个段落
         if (currentParagraph.length > 0) {
             paragraphs.push({
                 type: 'text',
@@ -130,8 +120,8 @@ class MarkdownTranslator {
         return paragraphs;
     }
     
-    // 翻译单个文本
-    async translateText(text, targetLang = 'ZH') {
+    // 翻译单个文本 - 官方 DeepL API
+    async translateTextOfficial(text, targetLang = 'ZH') {
         try {
             const response = await fetch(this.endpoint, {
                 method: 'POST',
@@ -146,14 +136,63 @@ class MarkdownTranslator {
             });
             
             if (!response.ok) {
-                throw new Error(`DeepLX API Error: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`DeepL API Error ${response.status}: ${errorText}`);
             }
             
             const data = await response.json();
             return data.translations[0].text;
         } catch (error) {
-            console.error('Translation error:', error);
+            console.error('Official API translation error:', error);
             throw error;
+        }
+    }
+    
+    // 翻译单个文本 - DeepLX 开源版
+    async translateTextDeepLX(text, targetLang = 'ZH') {
+        try {
+            const response = await fetch(this.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text,
+                    source_lang: 'EN',  // DeepLX 会自动检测
+                    target_lang: targetLang,
+                    auth_key: this.apiKey
+                })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`DeepLX API Error ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            
+            // DeepLX 可能的响应格式
+            if (data.data) {
+                return data.data;
+            } else if (data.translations && data.translations[0]) {
+                return data.translations[0].text;
+            } else if (typeof data === 'string') {
+                return data;
+            } else {
+                throw new Error('Unknown response format: ' + JSON.stringify(data));
+            }
+        } catch (error) {
+            console.error('DeepLX translation error:', error);
+            throw error;
+        }
+    }
+    
+    // 统一的翻译接口
+    async translateText(text, targetLang = 'ZH') {
+        if (this.apiType === 'official') {
+            return await this.translateTextOfficial(text, targetLang);
+        } else {
+            return await this.translateTextDeepLX(text, targetLang);
         }
     }
     
@@ -164,6 +203,10 @@ class MarkdownTranslator {
         
         let completed = 0;
         const total = paragraphs.filter(p => p.translatable).length;
+        
+        console.log(`API Type: ${this.apiType}`);
+        console.log(`Endpoint: ${this.endpoint}`);
+        console.log(`Total paragraphs to translate: ${total}`);
         
         for (let paragraph of paragraphs) {
             if (!paragraph.translatable) {
@@ -180,13 +223,15 @@ class MarkdownTranslator {
                     onProgress(completed, total, paragraph.content);
                 }
                 
-                // 添加延迟以避免 API 限流
                 await this.delay(300);
             } catch (error) {
-                // 翻译失败时保留原文
                 console.error('Failed to translate paragraph:', error);
                 translatedParagraphs.push(paragraph.content);
                 completed++;
+                
+                if (onProgress) {
+                    onProgress(completed, total, `Error: ${error.message}`);
+                }
             }
         }
         
@@ -196,6 +241,19 @@ class MarkdownTranslator {
     // 延迟函数
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    // 测试 API 连接
+    async testConnection() {
+        try {
+            const testText = 'Hello';
+            const result = await this.translateText(testText, 'ZH');
+            console.log('API test successful:', result);
+            return true;
+        } catch (error) {
+            console.error('API test failed:', error);
+            return false;
+        }
     }
 }
 
