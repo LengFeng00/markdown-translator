@@ -19,38 +19,31 @@ class MarkdownTranslatorApp {
     }
     
     bindEvents() {
-        // 文件上传
         document.getElementById('fileInput').addEventListener('change', (e) => {
             this.handleFileUpload(e);
         });
         
-        // 文本输入
         document.getElementById('textInput').addEventListener('input', (e) => {
             this.originalContent = e.target.value;
             this.updateWordCount();
         });
         
-        // DeepLX 设置
         document.getElementById('saveDeeplxSettings').addEventListener('click', () => {
             this.saveDeeplxSettings();
         });
         
-        // GitHub 设置
         document.getElementById('saveGithubSettings').addEventListener('click', () => {
             this.saveGithubSettings();
         });
         
-        // 翻译按钮
         document.getElementById('translateBtn').addEventListener('click', () => {
             this.startTranslation();
         });
         
-        // 上传到 GitHub 按钮
         document.getElementById('uploadToGithubBtn').addEventListener('click', () => {
             this.uploadToGitHub();
         });
         
-        // 下载按钮
         document.getElementById('downloadMarkdownBtn').addEventListener('click', () => {
             this.downloader.downloadMarkdown(this.translatedContent);
         });
@@ -63,12 +56,11 @@ class MarkdownTranslatorApp {
             this.downloader.downloadPDF(this.translatedContent);
         });
         
-        // 清除按钮
         document.getElementById('clearBtn').addEventListener('click', () => {
             this.clearAll();
         });
         
-        // 测试 API 连接按钮（新增）
+        // 添加测试 API 按钮
         const testApiBtn = document.createElement('button');
         testApiBtn.id = 'testApiBtn';
         testApiBtn.className = 'btn btn-secondary';
@@ -81,6 +73,18 @@ class MarkdownTranslatorApp {
         const deeplxSection = document.querySelector('.config-group:first-child');
         const saveBtn = document.getElementById('saveDeeplxSettings');
         saveBtn.parentNode.insertBefore(testApiBtn, saveBtn.nextSibling);
+        
+        // 添加调试信息按钮
+        const debugBtn = document.createElement('button');
+        debugBtn.id = 'debugBtn';
+        debugBtn.className = 'btn btn-secondary';
+        debugBtn.textContent = '显示调试信息';
+        debugBtn.style.marginTop = '10px';
+        debugBtn.addEventListener('click', () => {
+            this.showDebugInfo();
+        });
+        
+        saveBtn.parentNode.insertBefore(debugBtn, testApiBtn.nextSibling);
     }
     
     populateLanguageOptions() {
@@ -88,18 +92,16 @@ class MarkdownTranslatorApp {
         select.innerHTML = '';
         
         const languages = [
-            { code: 'ZH', name: '中文 (Chinese)' },
-            { code: 'EN-US', name: '英语 - 美式 (English - US)' },
-            { code: 'EN-GB', name: '英语 - 英式 (English - UK)' },
-            { code: 'JA', name: '日语 (Japanese)' },
-            { code: 'KO', name: '韩语 (Korean)' },
-            { code: 'FR', name: '法语 (French)' },
-            { code: 'DE', name: '德语 (German)' },
-            { code: 'ES', name: '西班牙语 (Spanish)' },
-            { code: 'IT', name: '意大利语 (Italian)' },
-            { code: 'PT-BR', name: '葡萄牙语 - 巴西 (Portuguese - Brazilian)' },
-            { code: 'PT-PT', name: '葡萄牙语 - 欧洲 (Portuguese - European)' },
-            { code: 'RU', name: '俄语 (Russian)' }
+            { code: 'ZH', name: '中文' },
+            { code: 'EN', name: '英语' },
+            { code: 'JA', name: '日语' },
+            { code: 'KO', name: '韩语' },
+            { code: 'FR', name: '法语' },
+            { code: 'DE', name: '德语' },
+            { code: 'ES', name: '西班牙语' },
+            { code: 'IT', name: '意大利语' },
+            { code: 'PT', name: '葡萄牙语' },
+            { code: 'RU', name: '俄语' }
         ];
         
         languages.forEach(lang => {
@@ -111,7 +113,6 @@ class MarkdownTranslatorApp {
     }
     
     loadSavedSettings() {
-        // DeepLX 设置
         const deeplxKey = localStorage.getItem(CONFIG.app.storageKeys.deeplxKey);
         const deeplxEndpoint = localStorage.getItem(CONFIG.app.storageKeys.deeplxEndpoint);
         if (deeplxKey) {
@@ -121,7 +122,6 @@ class MarkdownTranslatorApp {
             document.getElementById('deeplxEndpoint').value = deeplxEndpoint;
         }
         
-        // GitHub 设置
         const githubToken = localStorage.getItem(CONFIG.app.storageKeys.githubToken);
         const githubUsername = localStorage.getItem(CONFIG.app.storageKeys.githubUsername);
         if (githubToken) {
@@ -133,7 +133,6 @@ class MarkdownTranslatorApp {
     }
     
     updateUI() {
-        // 更新按钮状态
         const hasContent = this.originalContent.length > 0;
         const hasTranslation = this.translatedContent.length > 0;
         const isConfigured = this.translator.isValid();
@@ -144,18 +143,19 @@ class MarkdownTranslatorApp {
         document.getElementById('downloadHTMLBtn').disabled = !hasTranslation;
         document.getElementById('downloadPDFBtn').disabled = !hasTranslation;
         
-        // 更新状态指示器
         const deeplxStatus = document.getElementById('deeplxStatus');
         const githubStatus = document.getElementById('githubStatus');
         
         if (deeplxStatus) {
             deeplxStatus.className = isConfigured ? 'status configured' : 'status not-configured';
-            document.getElementById('deeplxStatusText').textContent = isConfigured ? '已配置' : '未配置';
+            const statusText = document.getElementById('deeplxStatusText');
+            if (statusText) statusText.textContent = isConfigured ? '已配置' : '未配置';
         }
         
         if (githubStatus) {
             githubStatus.className = this.github.isValid() ? 'status configured' : 'status not-configured';
-            document.getElementById('githubStatusText').textContent = this.github.isValid() ? '已配置' : '未配置';
+            const statusText = document.getElementById('githubStatusText');
+            if (statusText) statusText.textContent = this.github.isValid() ? '已配置' : '未配置';
         }
     }
     
@@ -163,13 +163,11 @@ class MarkdownTranslatorApp {
         const file = event.target.files[0];
         if (!file) return;
         
-        // 检查文件大小
         if (file.size > CONFIG.app.maxFileSize * 1024 * 1024) {
             alert(`文件太大！最大支持 ${CONFIG.app.maxFileSize}MB`);
             return;
         }
         
-        // 检查文件类型
         const ext = '.' + file.name.split('.').pop().toLowerCase();
         if (!CONFIG.app.supportedTypes.includes(ext)) {
             alert(`不支持的文件类型。支持：${CONFIG.app.supportedTypes.join(', ')}`);
@@ -200,12 +198,14 @@ class MarkdownTranslatorApp {
         let endpoint = document.getElementById('deeplxEndpoint').value.trim();
         
         if (!key) {
-            alert('请输入 DeepL API Key');
+            alert('❌ 请输入 API Key\n\nAPI Key 是必需的认证信息。');
             return;
         }
         
-        // 如果端点为空，使用默认值
-        if (!endpoint) {
+        if (endpoint && endpoint.includes('{api_key}')) {
+            // 保留模板格式
+        } else if (!endpoint) {
+            // 使用默认值
             endpoint = CONFIG.deeplx.defaultEndpoint;
         }
         
@@ -213,7 +213,43 @@ class MarkdownTranslatorApp {
         this.translator.setEndpoint(endpoint);
         
         this.updateUI();
-        this.showMessage('DeepL 设置已保存', 'success');
+        this.showMessage('✅ DeepL 设置已保存\n\n建议：点击"测试 API 连接"验证配置', 'success');
+    }
+    
+    showDebugInfo() {
+        const key = document.getElementById('deeplxKey').value.trim();
+        let endpoint = document.getElementById('deeplxEndpoint').value.trim();
+        
+        if (!endpoint) {
+            endpoint = CONFIG.deeplx.defaultEndpoint;
+        }
+        
+        let finalUrl = endpoint;
+        if (endpoint.includes('{api_key}')) {
+            finalUrl = endpoint.replace('{api_key}', key);
+        }
+        
+        const debugInfo = `
+=== 调试信息 ===
+
+API Key: ${key ? key.substring(0, 8) + '...' + key.substring(key.length - 4) : '(未设置)'}
+API Key 长度: ${key.length} 字符
+
+端点模板: ${endpoint}
+
+最终 URL: ${finalUrl.replace(key, '***')}
+
+建议:
+1. 检查 API Key 是否完整复制
+2. 确认没有多余的空格或换行符
+3. 验证 API Key 是否有效
+4. 打开浏览器控制台 (F12) 查看详细日志
+
+==========
+        `.trim();
+        
+        alert(debugInfo);
+        console.log(debugInfo);
     }
     
     async testAPIConnection() {
@@ -221,7 +257,7 @@ class MarkdownTranslatorApp {
         let endpoint = document.getElementById('deeplxEndpoint').value.trim();
         
         if (!key) {
-            alert('请先输入 DeepL API Key');
+            alert('❌ 请先输入 API Key');
             return;
         }
         
@@ -229,35 +265,71 @@ class MarkdownTranslatorApp {
             endpoint = CONFIG.deeplx.defaultEndpoint;
         }
         
-        this.showMessage('正在测试 API 连接...', 'info');
+        this.showMessage('⏳ 正在测试 API 连接...\n\n请查看浏览器控制台 (F12) 获取详细日志', 'info');
+        
+        // 配置 translator
+        this.translator.setApiKey(key);
+        this.translator.setEndpoint(endpoint);
         
         try {
-            const response = await fetch(endpoint, {
+            const response = await fetch(endpoint.includes('{api_key}') ? 
+                endpoint.replace('{api_key}', key) : 
+                endpoint, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `DeepL-Auth-Key ${key}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     text: 'Hello',
+                    source_lang: 'EN',
                     target_lang: 'ZH'
                 })
             });
             
+            console.log('Test Response Status:', response.status);
+            
             if (response.ok) {
                 const data = await response.json();
-                if (data.translations && data.translations[0]) {
-                    const translatedText = data.translations[0].text;
-                    this.showMessage(`✅ API 连接成功！测试翻译: "Hello" → "${translatedText}"`, 'success');
-                } else {
-                    this.showMessage('❌ API 响应格式错误', 'error');
+                console.log('Test Response Data:', data);
+                
+                let translatedText = '';
+                if (data.data) {
+                    translatedText = data.data;
+                } else if (data.translations && data.translations[0]) {
+                    translatedText = data.translations[0].text;
                 }
+                
+                this.showMessage(`✅ API 连接成功！\n\n测试翻译: "Hello" → "${translatedText}"\n\nAPI 配置正确，可以开始使用了！`, 'success');
             } else {
                 const errorText = await response.text();
-                this.showMessage(`❌ API 错误 (${response.status}): ${errorText}`, 'error');
+                console.error('Test Error Response:', errorText);
+                
+                let errorMsg = `❌ API 错误 (${response.status})\n\n`;
+                
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    if (errorJson.message) {
+                        errorMsg += `错误信息: ${errorJson.message}\n\n`;
+                    }
+                } catch (e) {
+                    errorMsg += `错误详情: ${errorText.substring(0, 200)}\n\n`;
+                }
+                
+                errorMsg += `可能的原因:\n`;
+                errorMsg += `1. API Key 不正确或已过期\n`;
+                errorMsg += `2. API Key 复制时不完整\n`;
+                errorMsg += `3. API Key 包含多余的空格或换行符\n`;
+                errorMsg += `4. API 服务暂时不可用\n\n`;
+                errorMsg += `建议操作:\n`;
+                errorMsg += `1. 重新复制 API Key，确保完整\n`;
+                errorMsg += `2. 点击"显示调试信息"查看详情\n`;
+                errorMsg += `3. 打开浏览器控制台 (F12) 查看详细日志`;
+                
+                this.showMessage(errorMsg, 'error');
             }
         } catch (error) {
-            this.showMessage(`❌ 连接失败: ${error.message}`, 'error');
+            console.error('Test Connection Error:', error);
+            this.showMessage(`❌ 连接失败\n\n错误: ${error.message}\n\n请检查:\n1. 网络连接\n2. API 端点地址\n3. 浏览器控制台 (F12)`, 'error');
         }
     }
     
@@ -274,7 +346,7 @@ class MarkdownTranslatorApp {
         this.github.setUsername(username);
         
         this.updateUI();
-        this.showMessage('GitHub 设置已保存', 'success');
+        this.showMessage('✅ GitHub 设置已保存', 'success');
     }
     
     async startTranslation() {
@@ -290,7 +362,6 @@ class MarkdownTranslatorApp {
         
         const targetLang = document.getElementById('targetLang').value;
         
-        // 禁用按钮
         document.getElementById('translateBtn').disabled = true;
         const progressContainer = document.getElementById('progressContainer');
         if (progressContainer) {
@@ -306,7 +377,6 @@ class MarkdownTranslatorApp {
                 }
             );
             
-            // 显示结果
             const resultOutput = document.getElementById('resultOutput');
             const resultContainer = document.getElementById('resultContainer');
             
@@ -318,10 +388,10 @@ class MarkdownTranslatorApp {
             }
             
             this.updateUI();
-            this.showMessage('翻译完成！', 'success');
+            this.showMessage('✅ 翻译完成！', 'success');
         } catch (error) {
             console.error('Translation error:', error);
-            this.showMessage(`翻译失败：${error.message}`, 'error');
+            this.showMessage(`❌ 翻译失败：${error.message}\n\n请查看浏览器控制台 (F12) 获取详细信息`, 'error');
         } finally {
             document.getElementById('translateBtn').disabled = false;
             if (progressContainer) {
@@ -373,14 +443,14 @@ class MarkdownTranslatorApp {
                 { description }
             );
             
-            this.showMessage(`创建成功！仓库地址：${result.url}`, 'success');
+            this.showMessage(`✅ 创建成功！\n\n仓库地址：${result.url}`, 'success');
             
             if (confirm('是否打开 GitHub 仓库？')) {
                 window.open(result.url, '_blank');
             }
         } catch (error) {
             console.error('Upload error:', error);
-            this.showMessage(`上传失败：${error.message}`, 'error');
+            this.showMessage(`❌ 上传失败：${error.message}`, 'error');
         }
     }
     
@@ -409,13 +479,13 @@ class MarkdownTranslatorApp {
     showMessage(message, type = 'info') {
         const messageBox = document.getElementById('messageBox');
         if (messageBox) {
-            messageBox.textContent = message;
+            messageBox.innerHTML = message.replace(/\n/g, '<br>');
             messageBox.className = `message-box ${type}`;
             messageBox.style.display = 'block';
             
             setTimeout(() => {
                 messageBox.style.display = 'none';
-            }, 5000);
+            }, 10000);
         } else {
             alert(message);
         }

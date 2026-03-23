@@ -2,14 +2,18 @@
 class MarkdownTranslator {
     constructor() {
         this.apiKey = localStorage.getItem(CONFIG.app.storageKeys.deeplxKey) || '';
-        this.endpoint = localStorage.getItem(CONFIG.app.storageKeys.deeplxEndpoint) || '';
+        this.endpoint = localStorage.getItem(CONFIG.app.storageKeys.deeplxEndpoint) || CONFIG.deeplx.defaultEndpoint;
         this.apiType = this.detectAPIType();
     }
     
     // 自动检测 API 类型
     detectAPIType() {
-        // deeplx.org 格式: https://api.deeplx.org/{key}/translate
-        if (this.endpoint.includes('deeplx.org') || this.endpoint.includes('api_key')) {
+        if (!this.endpoint) {
+            this.endpoint = CONFIG.deeplx.defaultEndpoint;
+        }
+        
+        // deeplx.org 格式: https://api.deeplx.org/{api_key}/translate
+        if (this.endpoint.includes('deeplx.org')) {
             return 'deeplx_org';
         }
         // 官方 DeepL API
@@ -24,21 +28,44 @@ class MarkdownTranslator {
     
     // 设置 API Key
     setApiKey(key) {
-        this.apiKey = key;
-        localStorage.setItem(CONFIG.app.storageKeys.deeplxKey, key);
+        this.apiKey = key.trim();
+        localStorage.setItem(CONFIG.app.storageKeys.deeplxKey, this.apiKey);
         this.apiType = this.detectAPIType();
+        console.log('API Key set:', this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'empty');
     }
     
     // 设置 API 端点
     setEndpoint(endpoint) {
-        this.endpoint = endpoint;
-        localStorage.setItem(CONFIG.app.storageKeys.deeplxEndpoint, endpoint);
+        this.endpoint = endpoint.trim();
+        if (!this.endpoint) {
+            this.endpoint = CONFIG.deeplx.defaultEndpoint;
+        }
+        localStorage.setItem(CONFIG.app.storageKeys.deeplxEndpoint, this.endpoint);
         this.apiType = this.detectAPIType();
+        console.log('Endpoint set:', this.endpoint);
     }
     
     // 验证配置
     isValid() {
-        return this.apiKey.length > 0 || this.endpoint.length > 0;
+        return this.apiKey.length > 0;
+    }
+    
+    // 构建完整的请求 URL
+    buildRequestURL() {
+        if (this.apiType === 'deeplx_org') {
+            // deeplx.org 格式: https://api.deeplx.org/{api_key}/translate
+            let url = this.endpoint;
+            if (url.includes('{api_key}')) {
+                url = url.replace('{api_key}', this.apiKey);
+            } else {
+                // 如果端点不包含 {api_key}，尝试添加
+                const baseUrl = url.replace(/\/translate$/, '');
+                url = `${baseUrl}/${this.apiKey}/translate`;
+            }
+            console.log('Final URL:', url.replace(this.apiKey, '***'));
+            return url;
+        }
+        return this.endpoint;
     }
     
     // 解析 Markdown 为段落
@@ -130,6 +157,7 @@ class MarkdownTranslator {
     // 翻译单个文本 - 官方 DeepL API
     async translateTextOfficial(text, targetLang = 'ZH') {
         try {
+            console.log('Using official DeepL API');
             const response = await fetch(this.endpoint, {
                 method: 'POST',
                 headers: {
@@ -158,6 +186,7 @@ class MarkdownTranslator {
     // 翻译单个文本 - DeepLX 开源版（标准格式）
     async translateTextDeepLX(text, targetLang = 'ZH') {
         try {
+            console.log('Using DeepLX standard format');
             const response = await fetch(this.endpoint, {
                 method: 'POST',
                 headers: {
@@ -196,28 +225,42 @@ class MarkdownTranslator {
     // 翻译单个文本 - deeplx.org 格式
     async translateTextDeepLXOrg(text, targetLang = 'ZH') {
         try {
-            // deeplx.org 格式: https://api.deeplx.org/{api_key}/translate
-            // API Key 已经在端点 URL 中，不需要额外的认证
-            const url = this.endpoint.replace('{api_key}', this.apiKey);
+            const url = this.buildRequestURL();
+            console.log('Using deeplx.org format');
+            console.log('Request URL (partially hidden):', url.replace(this.apiKey, '***'));
+            
+            const requestBody = {
+                text: text,
+                source_lang: 'EN',
+                target_lang: targetLang
+            };
+            console.log('Request body:', JSON.stringify(requestBody, null, 2));
             
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    text: text,
-                    source_lang: 'EN',
-                    target_lang: targetLang
-                })
+                body: JSON.stringify(requestBody)
             });
+            
+            console.log('Response status:', response.status);
             
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(`DeepLX.org Error ${response.status}: ${errorText}`);
+                console.error('Error response:', errorText);
+                
+                // 尝试解析错误信息
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    throw new Error(`DeepLX.org Error ${response.status}: ${errorJson.message || errorText}`);
+                } catch {
+                    throw new Error(`DeepLX.org Error ${response.status}: ${errorText}`);
+                }
             }
             
             const data = await response.json();
+            console.log('Response data:', JSON.stringify(data, null, 2));
             
             // deeplx.org 可能的响应格式
             if (data.data) {
@@ -237,6 +280,14 @@ class MarkdownTranslator {
     
     // 统一的翻译接口
     async translateText(text, targetLang = 'ZH') {
+        console.log(`=== Translation Request ===`);
+        console.log(`API Type: ${this.apiType}`);
+        console.log(`Text: "${text.substring(0, 50)}..."`);
+        console.log(`Target Language: ${targetLang}`);
+        console.log(`API Key: ${this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'NOT SET'}`);
+        console.log(`Endpoint: ${this.endpoint}`);
+        console.log(`========================`);
+        
         if (this.apiType === 'official') {
             return await this.translateTextOfficial(text, targetLang);
         } else if (this.apiType === 'deeplx_org') {
@@ -254,9 +305,10 @@ class MarkdownTranslator {
         let completed = 0;
         const total = paragraphs.filter(p => p.translatable).length;
         
+        console.log(`=== Markdown Translation ===`);
         console.log(`API Type: ${this.apiType}`);
-        console.log(`Endpoint: ${this.endpoint}`);
         console.log(`Total paragraphs to translate: ${total}`);
+        console.log(`============================`);
         
         for (let paragraph of paragraphs) {
             if (!paragraph.translatable) {
@@ -298,12 +350,13 @@ class MarkdownTranslator {
     async testConnection() {
         try {
             const testText = 'Hello';
+            console.log('=== Testing API Connection ===');
             const result = await this.translateText(testText, 'ZH');
-            console.log('API test successful:', result);
-            return true;
+            console.log('✅ API test successful:', result);
+            return { success: true, result };
         } catch (error) {
-            console.error('API test failed:', error);
-            throw error;
+            console.error('❌ API test failed:', error);
+            return { success: false, error: error.message };
         }
     }
 }
