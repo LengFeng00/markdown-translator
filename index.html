@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Translator - DeepLX 翻译工具</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header>
+            <h1>🌐 Markdown Translator</h1>
+            <p class="subtitle">使用 DeepLX API 翻译 Markdown 文档并上传到 GitHub</p>
+        </header>
+
+        <!-- 消息提示 -->
+        <div id="messageBox" class="message-box" style="display: none;"></div>
+
+        <!-- 配置区域 -->
+        <section class="config-section">
+            <h2>⚙️ 配置</h2>
+            
+            <!-- DeepLX 设置 -->
+            <div class="config-group">
+                <h3>DeepLX API 设置</h3>
+                <div class="status-indicator">
+                    <span id="deeplxStatus" class="status not-configured"></span>
+                    <span id="deeplxStatusText">未配置</span>
+                </div>
+                <div class="form-group">
+                    <label for="deeplxKey">API Key:</label>
+                    <input type="password" id="deeplxKey" placeholder="输入 DeepLX API Key">
+                </div>
+                <div class="form-group">
+                    <label for="deeplxEndpoint">API 端点（可选）:</label>
+                    <input type="text" id="deeplxEndpoint" placeholder="https://api.deepl.com/v2/translate">
+                </div>
+                <button id="saveDeeplxSettings" class="btn btn-primary">保存 DeepLX 设置</button>
+            </div>
+
+            <!-- GitHub 设置 -->
+            <div class="config-group">
+                <h3>GitHub API 设置</h3>
+                <div class="status-indicator">
+                    <span id="githubStatus" class="status not-configured"></span>
+                    <span id="githubStatusText">未配置</span>
+                </div>
+                <div class="form-group">
+                    <label for="githubToken">Personal Access Token:</label>
+                    <input type="password" id="githubToken" placeholder="输入 GitHub Token">
+                    <small>需要 repo 权限</small>
+                </div>
+                <div class="form-group">
+                    <label for="githubUsername">用户名:</label>
+                    <input type="text" id="githubUsername" placeholder="输入 GitHub 用户名">
+                </div>
+                <button id="saveGithubSettings" class="btn btn-primary">保存 GitHub 设置</button>
+            </div>
+        </section>
+
+        <!-- 翻译区域 -->
+        <section class="translate-section">
+            <h2>📝 翻译</h2>
+            
+            <!-- 输入方式 -->
+            <div class="input-methods">
+                <div class="method-group">
+                    <h3>方式 1: 上传文件</h3>
+                    <input type="file" id="fileInput" accept=".md,.markdown,.txt">
+                    <small>支持: .md, .markdown, .txt (最大 10MB)</small>
+                </div>
+                
+                <div class="method-group">
+                    <h3>方式 2: 粘贴文本</h3>
+                    <textarea id="textInput" placeholder="在此粘贴 Markdown 内容..." rows="10"></textarea>
+                    <div id="wordCount" class="word-count">0 词, 0 字符</div>
+                </div>
+            </div>
+
+            <!-- 翻译设置 -->
+            <div class="translate-settings">
+                <div class="form-group">
+                    <label for="targetLang">目标语言:</label>
+                    <select id="targetLang">
+                        <option value="ZH">中文 (Chinese)</option>
+                        <option value="EN">英语 (English)</option>
+                        <option value="JA">日语 (Japanese)</option>
+                        <option value="KO">韩语 (Korean)</option>
+                        <option value="FR">法语 (French)</option>
+                        <option value="DE">德语 (German)</option>
+                        <option value="ES">西班牙语 (Spanish)</option>
+                        <option value="IT">意大利语 (Italian)</option>
+                        <option value="PT">葡萄牙语 (Portuguese)</option>
+                        <option value="RU">俄语 (Russian)</option>
+                    </select>
+                </div>
+                <button id="translateBtn" class="btn btn-large btn-success" disabled>开始翻译</button>
+                <button id="clearBtn" class="btn btn-secondary">清除所有</button>
+            </div>
+
+            <!-- 进度显示 -->
+            <div id="progressContainer" class="progress-container" style="display: none;">
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="progressText" class="progress-text">翻译中... 0/0 (0%)</div>
+                <div id="currentSegment" class="current-segment"></div>
+            </div>
+
+            <!-- 结果显示 -->
+            <div id="resultContainer" class="result-container" style="display: none;">
+                <h3>翻译结果:</h3>
+                <textarea id="resultOutput" rows="15" readonly></textarea>
+                
+                <div class="action-buttons">
+                    <h4>下载选项:</h4>
+                    <button id="downloadMarkdownBtn" class="btn btn-primary">下载 Markdown</button>
+                    <button id="downloadHTMLBtn" class="btn btn-primary">下载 HTML</button>
+                    <button id="downloadPDFBtn" class="btn btn-primary">下载 PDF</button>
+                    
+                    <h4>GitHub 选项:</h4>
+                    <button id="uploadToGithubBtn" class="btn btn-large btn-success">上传到 GitHub</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>&copy; 2026 Markdown Translator | Powered by DeepLX API & GitHub API</p>
+        </footer>
+    </div>
+
+    <!-- 加载脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/translator.js"></script>
+    <script src="js/github.js"></script>
+    <script src="js/downloader.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
